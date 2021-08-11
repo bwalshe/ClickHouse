@@ -12,7 +12,6 @@
 #include <DataTypes/DataTypesNumber.h>
 
 #include <AggregateFunctions/IAggregateFunction.h>
-#include <common/logger_useful.h>
 
 namespace ErrorCodes
 {
@@ -64,16 +63,13 @@ public:
         Float64 value = assert_cast<const ColumnVector<ValueType> &>(*columns[0]).getData()[row_num];
         auto ts = assert_cast<const ColumnVector<TimestampType> &>(*columns[1]).getData()[row_num];
 
-        static auto * log = &Poco::Logger::get("AggregateFunctionExpMovingAverageTrace");
 
         if(!this->data(place).initialized) {
-            LOG_TRACE(log, "initializing {}", getName());
             this->data(place).avg = value;
             this->data(place).initialized = true;
         } else {
             Int64 delta = ts - this->data(place).ts;
             auto alpha = 1 - std::exp(-delta);
-            LOG_TRACE(log, "delta = {}, alpha = {}", delta, alpha);
             this->data(place).avg = alpha * value + (1 - alpha) * this->data(place).avg;
         } 
         this->data(place).ts = ts;
