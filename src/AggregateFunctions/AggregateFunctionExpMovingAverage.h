@@ -25,7 +25,7 @@ namespace DB
 template <typename ValueType, typename TimestampType>
 struct AggregationFunctionExpMovingAverageData
 {
-    ValueType avg = 0;
+    Float64 avg = 0;
     TimestampType ts = 0;
     bool initialized = false;
 };
@@ -56,12 +56,12 @@ public:
 
     String getName() const override { return "expMovingAverage"; }
 
-    DataTypePtr getReturnType() const override { return std::make_shared<DataTypeNumber<ValueType>>(); }
+    DataTypePtr getReturnType() const override { return std::make_shared<DataTypeFloat64>(); }
 
     void NO_SANITIZE_UNDEFINED ALWAYS_INLINE add(AggregateDataPtr __restrict place, const IColumn ** columns, size_t row_num, Arena *) const override
     {
             
-        auto value = assert_cast<const ColumnVector<ValueType> &>(*columns[0]).getData()[row_num];
+        Float64 value = assert_cast<const ColumnVector<ValueType> &>(*columns[0]).getData()[row_num];
         auto ts = assert_cast<const ColumnVector<TimestampType> &>(*columns[1]).getData()[row_num];
 
         static auto * log = &Poco::Logger::get("AggregateFunctionExpMovingAverageTrace");
@@ -71,7 +71,7 @@ public:
             this->data(place).avg = value;
             this->data(place).initialized = true;
         } else {
-            long delta = ts - this->data(place).ts;
+            Int64 delta = ts - this->data(place).ts;
             auto alpha = 1 - std::exp(-delta);
             LOG_TRACE(log, "delta = {}, alpha = {}", delta, alpha);
             this->data(place).avg = alpha * value + (1 - alpha) * this->data(place).avg;
@@ -89,19 +89,19 @@ public:
 
     void serialize(ConstAggregateDataPtr __restrict place, WriteBuffer & buf) const override
     {
-        writeIntBinary(this->data(place).avg, buf);
+        writeFloatBinary(this->data(place).avg, buf);
         writeIntBinary(this->data(place).ts, buf);
     }
 
     void deserialize(AggregateDataPtr __restrict place, ReadBuffer & buf, Arena *) const override
     {
-        readIntBinary(this->data(place).avg, buf);
+        readFloatBinary(this->data(place).avg, buf);
         readIntBinary(this->data(place).ts, buf);
     }
 
     void insertResultInto(AggregateDataPtr __restrict place, IColumn & to, Arena *) const override
     {
-        assert_cast<ColumnVector<ValueType> &>(to).getData().push_back(this->data(place).avg);
+        assert_cast<ColumnFloat64 &>(to).getData().push_back(this->data(place).avg);
     }
 };
 
