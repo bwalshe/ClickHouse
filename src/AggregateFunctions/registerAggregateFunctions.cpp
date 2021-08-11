@@ -49,6 +49,7 @@ void registerAggregateFunctionMannWhitney(AggregateFunctionFactory &);
 void registerAggregateFunctionWelchTTest(AggregateFunctionFactory &);
 void registerAggregateFunctionStudentTTest(AggregateFunctionFactory &);
 void registerAggregateFunctionSequenceNextNode(AggregateFunctionFactory &);
+void registerAggregateFunctionExpMovingAverage(AggregateFunctionFactory &);
 
 class AggregateFunctionCombinatorFactory;
 void registerAggregateFunctionCombinatorIf(AggregateFunctionCombinatorFactory &);
@@ -117,6 +118,7 @@ void registerAggregateFunctions()
         registerWindowFunctions(factory);
 
         registerAggregateFunctionIntervalLengthSum(factory);
+        registerAggregateFunctionExpMovingAverage(factory);
     }
 
     {
