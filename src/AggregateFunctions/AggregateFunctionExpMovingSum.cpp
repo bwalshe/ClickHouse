@@ -1,4 +1,4 @@
-#include <AggregateFunctions/AggregateFunctionExpMovingAverage.h>
+#include <AggregateFunctions/AggregateFunctionExpMovingSum.h>
 
 #include <AggregateFunctions/AggregateFunctionFactory.h>
 #include <AggregateFunctions/FactoryHelpers.h>
@@ -17,7 +17,7 @@ namespace ErrorCodes
 namespace
 {
 
-AggregateFunctionPtr createAggregateFunctionExpMovingAverage(
+AggregateFunctionPtr createAggregateFunctionExpMovingSum(
     const String & name,
     const DataTypes & arguments,
     const Array & params,
@@ -35,16 +35,16 @@ AggregateFunctionPtr createAggregateFunctionExpMovingAverage(
         throw Exception("Illegal type " + arguments[1]->getName() + " of argument for aggregate function " +
             name + ", must be Int, Float, Date, DateTime", ErrorCodes::ILLEGAL_TYPE_OF_ARGUMENT);
 
-    return AggregateFunctionPtr(createWithTwoNumericOrDateTypes<AggregationFunctionExpMovingAverage>(
+    return AggregateFunctionPtr(createWithTwoNumericOrDateTypes<AggregationFunctionExpMovingSum>(
         *arguments[0], *arguments[1], arguments, params));
 }
 }
 
-void registerAggregateFunctionExpMovingAverage(AggregateFunctionFactory & factory)
+void registerAggregateFunctionExpMovingSum(AggregateFunctionFactory & factory)
 {
     AggregateFunctionProperties properties = { .returns_default_when_only_null = true, .is_order_dependent = true };
 
-    factory.registerFunction("expMovingAverage", { createAggregateFunctionExpMovingAverage, properties });
+    factory.registerFunction("expMovingSum", { createAggregateFunctionExpMovingSum, properties });
 }
 
 }

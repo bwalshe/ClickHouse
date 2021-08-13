@@ -27,24 +27,24 @@ namespace ErrorCodes
 }
 
 template <typename ValueType, typename TimestampType>
-struct AggregationFunctionExpMovingAverageData
+struct AggregationFunctionExpMovingSumData
 {
-    Float64 avg = 0;
+    Float64 sum = 0;
     TimestampType ts = 0;
     bool initialized = false;
 };
 
 
 template <typename ValueType, typename TimestampType>
-class AggregationFunctionExpMovingAverage final
+class AggregationFunctionExpMovingSum final
     : public IAggregateFunctionDataHelper<
-        AggregationFunctionExpMovingAverageData<ValueType, TimestampType>,
-        AggregationFunctionExpMovingAverage<ValueType, TimestampType>
+        AggregationFunctionExpMovingSumData<ValueType, TimestampType>,
+        AggregationFunctionExpMovingSum<ValueType, TimestampType>
       >
 {
     const Float64 period;
     
-    static Float64 getAveragingPeriod(const Array & params) 
+    static Float64 getSummingPeriod(const Array & params) 
     {
         if(params.empty())
             return 1.0;
@@ -58,23 +58,24 @@ class AggregationFunctionExpMovingAverage final
     }
 
 public:
-    AggregationFunctionExpMovingAverage(const DataTypes & arguments, const Array & params)
+    AggregationFunctionExpMovingSum(const DataTypes & arguments, const Array & params)
         : IAggregateFunctionDataHelper<
-            AggregationFunctionExpMovingAverageData<ValueType, TimestampType>,
-            AggregationFunctionExpMovingAverage<ValueType, TimestampType>
-        >{arguments, params}, period(getAveragingPeriod(params))
+            AggregationFunctionExpMovingSumData<ValueType, TimestampType>,
+            AggregationFunctionExpMovingSum<ValueType, TimestampType>
+        >{arguments, params}, period(getSummingPeriod(params))
     {}
 
-    AggregationFunctionExpMovingAverage()
+    AggregationFunctionExpMovingSum()
         : IAggregateFunctionDataHelper<
-            AggregationFunctionExpMovingAverageData<ValueType, TimestampType>,
-            AggregationFunctionExpMovingAverage<ValueType, TimestampType>
+            AggregationFunctionExpMovingSumData<ValueType, TimestampType>,
+            AggregationFunctionExpMovingSum<ValueType, TimestampType>
         >{}
     {}
 
+
     bool allocatesMemoryInArena() const override { return false; }
 
-    String getName() const override { return "expMovingAverage"; }
+    String getName() const override { return "expMovingSum"; }
 
     DataTypePtr getReturnType() const override { return std::make_shared<DataTypeFloat64>(); }
 
@@ -86,39 +87,53 @@ public:
 
 
         if(!this->data(place).initialized) {
-            this->data(place).avg = value;
+            this->data(place).sum = value;
             this->data(place).initialized = true;
         } else {
             Int64 delta = ts - this->data(place).ts;
-            auto alpha = 1 - std::exp(-delta / period);
-            this->data(place).avg = alpha * value + (1 - alpha) * this->data(place).avg;
+            this->data(place).sum = value + std::exp(-delta / period) * this->data(place).sum;
         } 
         this->data(place).ts = ts;
     }
 
-    void NO_SANITIZE_UNDEFINED ALWAYS_INLINE merge(AggregateDataPtr, ConstAggregateDataPtr, Arena *) const override
+    void NO_SANITIZE_UNDEFINED ALWAYS_INLINE merge(AggregateDataPtr __restrict place, ConstAggregateDataPtr rhs, Arena *) const override
     {
-        throw Exception(ErrorCodes::NOT_IMPLEMENTED,
-            "The state merge is not implemented for function '{}'",
-            getName());
+        using Data = AggregationFunctionExpMovingSumData<ValueType, TimestampType>;
+        const Data *first;
+        const Data *second;
+
+        if(this->data(place).ts < this->data(rhs).ts) {
+            first = &this->data(place);
+            second = &this->data(rhs);
+        }
+        else {
+            first = &this->data(rhs);
+            second = &this->data(place);
+        }
+
+        Int64 delta = second->ts - first->ts;
+        this->data(place).sum = second->sum + std::exp(-delta / period) * first->sum;
+        this->data(place).ts = second->ts;
 
     }
 
     void serialize(ConstAggregateDataPtr __restrict place, WriteBuffer & buf) const override
     {
-        writeFloatBinary(this->data(place).avg, buf);
+        writeFloatBinary(this->data(place).sum, buf);
         writeIntBinary(this->data(place).ts, buf);
+        writePODBinary(this->data(place).initialized, buf);
     }
 
     void deserialize(AggregateDataPtr __restrict place, ReadBuffer & buf, Arena *) const override
     {
-        readFloatBinary(this->data(place).avg, buf);
+        readFloatBinary(this->data(place).sum, buf);
         readIntBinary(this->data(place).ts, buf);
+        readPODBinary(this->data(place).initialized, buf);
     }
 
     void insertResultInto(AggregateDataPtr __restrict place, IColumn & to, Arena *) const override
     {
-        assert_cast<ColumnFloat64 &>(to).getData().push_back(this->data(place).avg);
+        assert_cast<ColumnFloat64 &>(to).getData().push_back(this->data(place).sum);
     }
 };
 
